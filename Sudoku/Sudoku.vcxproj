@@ -138,6 +138,13 @@
   <ItemGroup>
     <ClInclude Include="src\Shader.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include=".gitignore" />
+    <None Include="src\grid.frag" />
+    <None Include="src\grid.vert" />
+    <None Include="src\txt.frag" />
+    <None Include="src\txt.vert" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

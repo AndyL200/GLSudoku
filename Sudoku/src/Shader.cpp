@@ -1,13 +1,16 @@
 #include "Shader.h"
 
-
 std::string get_file_contents(const char* filename)
 {
-	std::fstream in(filename, std::stream::ios);
-
+	std::fstream in(filename, std::ios::binary);
+	std::string contents;
 	if (in)
 	{
-
+		in.seekg(0);
+		int count = 0;
+		in.tellg();
+		contents.resize(count);
+		in.read(contents, count);
 	}
 }
 

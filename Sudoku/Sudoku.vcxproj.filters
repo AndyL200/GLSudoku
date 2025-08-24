@@ -27,4 +27,11 @@
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <None Include=".gitignore" />
+    <None Include="src\grid.vert" />
+    <None Include="src\grid.frag" />
+    <None Include="src\txt.vert" />
+    <None Include="src\txt.frag" />
+  </ItemGroup>
 </Project>
