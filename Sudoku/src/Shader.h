@@ -1,8 +1,14 @@
-#include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
-#include <glad/glad.h>
+
+#ifndef SUDO_SHADE
+#define SUDO_SHADE
+
 #include <iostream>
 #include <fstream>
+#include <glad/glad.h>
+
+#include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+
 
 
 class Shader
@@ -14,3 +20,5 @@ public:
 	void Use();
 	void Destroy();
 };
+
+#endif

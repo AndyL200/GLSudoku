@@ -6,12 +6,17 @@
 
 
 
+bool TO_CHECK = false;
+int INPUT_DIGIT = 0;
+
 struct GameParameters
 {
 	std::vector<GLfloat> vertices;
-	std::vector<GLfloat> numPositions;
+	std::vector<GLfloat> selections;
 	std::vector<GLfloat> gaps_x;
 	std::vector<GLfloat> gaps_y;
+	std::vector<GLfloat> indicies_bottom;
+	std::vector<GLfloat> indicies;
 	float left;
 	float right;
 	float top;
@@ -20,7 +25,7 @@ struct GameParameters
 };
 struct GLParameters
 {
-	GLuint VAO, VBO, tex;
+	GLuint VAO, VBO, EBO, tex;
 	GLFWwindow* window;
 	Shader* txtShader;
 	Shader* gridShader;
@@ -82,52 +87,70 @@ public:
 		GP.vertices =
 		{
 			//Coords // Color //
-			left, top,					0.0f, 0.0f, 0.0f,
-			left, bottom,				0.0f, 0.0f, 0.0f,
-			left + gaps_x[0], top,		0.0f, 0.0f, 0.0f,
-			left + gaps_x[0], bottom,	0.0f, 0.0f, 0.0f,
-			left + gaps_x[1], top,		0.0f, 0.0f, 0.0f,
-			left + gaps_x[1], bottom,	0.0f, 0.0f, 0.0f,
-			left + gaps_x[2], top,		0.0f, 0.0f, 0.0f,
-			left + gaps_x[2], bottom,	0.0f, 0.0f, 0.0f,
-			left + gaps_x[3], top,		0.0f, 0.0f, 0.0f,
-			left + gaps_x[3], bottom,	0.0f, 0.0f, 0.0f,
-			left + gaps_x[4], top,		0.0f, 0.0f, 0.0f,
-			left + gaps_x[4], bottom,	0.0f, 0.0f, 0.0f,
-			left + gaps_x[5], top,		0.0f, 0.0f, 0.0f,
-			left + gaps_x[5], bottom,	0.0f, 0.0f, 0.0f,
-			left + gaps_x[6], top,		0.0f, 0.0f, 0.0f,
-			left + gaps_x[6], bottom,	0.0f, 0.0f, 0.0f,
-			left + gaps_x[7], top,		0.0f, 0.0f, 0.0f,
-			left + gaps_x[7], bottom,	0.0f, 0.0f, 0.0f,
-			right, top,					0.0f, 0.0f, 0.0f,
-			right, bottom,				0.0f, 0.0f, 0.0f,
+			left, top,				
+			left, bottom,			
+			left + gaps_x[0], top,	
+			left + gaps_x[0], bottom,
+			left + gaps_x[1], top,	
+			left + gaps_x[1], bottom,
+			left + gaps_x[2], top,	
+			left + gaps_x[2], bottom,
+			left + gaps_x[3], top,	
+			left + gaps_x[3], bottom,
+			left + gaps_x[4], top,	
+			left + gaps_x[4], bottom,
+			left + gaps_x[5], top,	
+			left + gaps_x[5], bottom,
+			left + gaps_x[6], top,	
+			left + gaps_x[6], bottom,
+			left + gaps_x[7], top,	
+			left + gaps_x[7], bottom,
+			right, top,				
+			right, bottom,			
 
-			bottom, left,				0.0f, 0.0f, 0.0f,
-			bottom, right,				0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[0], left,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[0], right,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[1], left,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[1], right,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[2], left,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[2], right,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[3], left,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[3], right,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[4], left,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[4], right,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[5], left,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[5], right,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[6], left,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[6], right,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[7], left,	0.0f, 0.0f, 0.0f,
-			bottom + gaps_y[7], right,	0.0f, 0.0f, 0.0f,
-			top, left,					0.0f, 0.0f, 0.0f,
-			top, right,					0.0f, 0.0f, 0.0f,
+			bottom, left,			
+			bottom, right,			
+			bottom + gaps_y[0], left,
+			bottom + gaps_y[0], right,
+			bottom + gaps_y[1], left,
+			bottom + gaps_y[1], right,
+			bottom + gaps_y[2], left,
+			bottom + gaps_y[2], right,
+			bottom + gaps_y[3], left,
+			bottom + gaps_y[3], right,
+			bottom + gaps_y[4], left,
+			bottom + gaps_y[4], right,
+			bottom + gaps_y[5], left,
+			bottom + gaps_y[5], right,
+			bottom + gaps_y[6], left,
+			bottom + gaps_y[6], right,
+			bottom + gaps_y[7], left,
+			bottom + gaps_y[7], right,
+			top, left,				
+			top, right,				
 
 
 		};
 
-		GLint indicies[] =
+		float selection_menu_bottom = height * 0.95f;
+		float selection_menu_top = height * 0.85f;
+		GP.selections =
+		{
+			left, selection_menu_top,
+			right, selection_menu_top,
+			left, selection_menu_bottom,
+			right, selection_menu_bottom,
+		};
+
+		GP.indicies_bottom =
+		{
+			1, 2,
+			3, 4,
+			1, 3,
+			2, 4
+		};
+
+		GP.indicies =
 		{
 			0, 1,
 			2, 3,
@@ -143,14 +166,15 @@ public:
 			20, 21
 
 		};
-		glGenVertexArrays(1, &VAO);
-		glGenBuffers(1, &VBO);
+		glGenVertexArrays(1, &glP.VAO);
+		glGenBuffers(1, &glP.VBO);
+		glGenBuffers(1, &glP.EBO);
 
 		glActiveTexture(GL_TEXTURE0);
-		glGenTextures(1, &tex);
-		glBindTexture(GL_TEXTURE_2D, tex);
-		glUniform1i(uniform_tex, 0);
-		glUniform3f(uniform_col, 1.0f, 1.0f, 1.0f);
+		glGenTextures(1, &glP.tex);
+		glBindTexture(GL_TEXTURE_2D, glP.tex);
+		glUniform1i(glP.uniform_tex, 0);
+		glUniform3f(glP.uniform_col, 1.0f, 1.0f, 1.0f);
 
 		FT_Library ft;
 		if (FT_Init_FreeType(&ft))
@@ -178,10 +202,10 @@ public:
 
 	~SudokuGame()
 	{
-		glDeleteProgram(gridShader->ID);
-		glDeleteProgram(txtShader->ID);
-		glDeleteVertexArrays(1, &VAO);
-		glDeleteBuffers(1, &VBO);
+		glDeleteProgram(glP.gridShader->ID);
+		glDeleteProgram(glP.txtShader->ID);
+		glDeleteVertexArrays(1, &glP.VAO);
+		glDeleteBuffers(1, &glP.VBO);
 	}
 	void drawLines()
 	{
@@ -191,8 +215,7 @@ public:
 		glP.gridShader->Use();
 
 		glVertexAttribPointer(0, sizeof(GLfloat) * 2, GL_FLOAT, GL_FALSE, 0, 0);
-		glVertexAttribPointer(1, sizeof(GLfloat) * 3, GL_FLOAT, GL_FALSE, 0, (void*)2);
-		glBufferData(GL_ARRAY_BUFFER, GP.vertices.size() * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, GP.vertices.size() * sizeof(GLfloat), GP.vertices.data(), GL_STATIC_DRAW);
 
 		glDrawArrays(GL_LINE, 0, 36);
 
@@ -211,8 +234,8 @@ public:
 	void renderDigit(int digit, int x, int y)
 	{
 
-		glBindVertexArray(VAO);
-		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBindVertexArray(glP.VAO);
+		glBindBuffer(GL_ARRAY_BUFFER, glP.VBO);
 
 		glVertexAttribPointer(0, sizeof(GLfloat) * 4, GL_FLOAT, GL_FALSE, 0, 0);
 
@@ -247,7 +270,7 @@ public:
 			GL_UNSIGNED_BYTE,
 			g->bitmap.buffer
 		);
-
+		
 		float x2 = x + g->bitmap_left * sx;
 		float y2 = -y - g->bitmap_top * sy;
 		float w = g->bitmap.width * sx;
@@ -270,20 +293,54 @@ public:
 	}
 	SudokuState sudokuValid()
 	{
-		unsigned int row = 0, col = 0, box = 0;
+		uint16_t row = 0, col = 0, box = 0;
+		uint16_t count = 0;
 
 		for (int i = 0; i < 9; ++i)
 		{
-			if (1 << i & row)
+			for (int j = 0; j < 9; ++j)
 			{
-				return SUDOKU_INVALID;
+				int digit = matrix[i][j]-1;
+				if (1 << digit & row)
+				{
+					return SUDOKU_INVALID;
+				}
+				else if (digit >= 0) {
+					row |= 1 << digit;
+				}
+
+				digit = matrix[j][i] - 1;
+				if (1 << digit & col)
+				{
+					return SUDOKU_INVALID;
+				}
+				else if (digit >= 0)
+				{
+					col |= 1 << matrix[j][i];
+				}
+
+				digit = matrix[(3 * (i / 3)) + j / 3][3 * (i % 3) + j % 3] - 1;
+				if (1 << digit & box)
+				{
+					return SUDOKU_INVALID;
+				}
+				else if (digit >= 0)
+				{
+					box |= 1 << digit;
+				}
+			}
+			uint16_t max_solve = 1 << 10 - 1;
+			if (row == max_solve && col == max_solve && box == max_solve)
+			{
+				count++;
 			}
 		}
-
-		if (row == 511, col == 511, box == 511)
+		if (count == 9)
 		{
 			return SUDOKU_SOLVED;
 		}
+		
+		return SUDOKU_NEUTRAL;
 	}
 	void process_input(int digit, int x, int y)
 	{
@@ -301,40 +358,71 @@ public:
 		}
 		renderDigit(matrix[x][y], x, y);
 	}
+
+	std::pair<int, int> insideGrid()
+	{
+		double xpos, ypos;
+		glfwGetCursorPos(glP.window, &xpos, &ypos);
+		if (xpos > GP.left and xpos <  GP.right and ypos > GP.top and ypos < GP.bottom)
+		{
+			int x_idx = -1;
+			int y_idx = -1;
+			for (int i = 0; i < 8; ++i)
+			{
+				if (xpos > GP.gaps_x[i])
+				{
+					x_idx = i;
+				}
+				if (ypos > GP.gaps_y[i])
+				{
+					y_idx = i;
+				}
+			}
+			return { x_idx, y_idx };
+		}
+		return { -1, -1 };
+	}
+
+	void changeGridVal(int val)
+	{
+		std::pair<int, int> p = insideGrid();
+		int x_i = p.first;
+		int y_i = p.second;
+
+		if (x_i == -1 || y_i == -1)
+		{
+			return;
+		}
+
+		matrix[x_i][y_i] = val;
+		process_input(val, x_i, y_i);
+	}
+
+	void waitForUpdate()
+	{
+		glBindVertexArray(glP.VAO);
+		glBindBuffer(GL_ARRAY_BUFFER, glP.VBO);
+		//EBO here
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, glP.EBO);
+
+		glP.gridShader->Use();
+
+		glVertexAttribPointer(0, sizeof(GLfloat) * 2, GL_FLOAT, GL_FALSE, 0, 0);
+		glBufferData(GL_ARRAY_BUFFER, GP.selections.size() * sizeof(GLfloat), GP.selections.data(), GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, GP.indicies_bottom.size() * sizeof(GLfloat), GP.indicies_bottom.data(), GL_STATIC_DRAW);
+
+
+		glDrawElements(GL_LINES, GP.indicies_bottom.size(), GL_UNSIGNED_INT, 0);
+
+	}
 };
 
-std::pair<int, int> insideGrid(SudokuGame& game)
-{
-	double xpos, ypos;
-	glfwGetCursorPos(game.glP.window, &xpos, &ypos);
-	if (xpos > game.GP.left and xpos <  game.GP.right and ypos > game.GP.top and ypos < game.GP.bottom)
-	{
-		int x_idx = -1;
-		int y_idx = -1;
-		for (int i = 0; i < 8; ++i)
-		{
-			if (xpos > game.GP.gaps_x[i])
-			{
-				x_idx = i;
-			}
-			if (ypos > game.GP.gaps_y[i])
-			{
-				y_idx = i;
-			}
-		}
-		return { x_idx, y_idx };
-	}
-	return { -1, -1 };
-}
+
 static void mouseCallBack(GLFWwindow* window, int button, int action, int mods)
 {
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
 	{
-		std::pair<int, int> xy = insideGrid();
-		if (xy.first != -1 and xy.second != -1)
-		{
-
-		}
+		TO_CHECK = true;
 	}
 }
 
@@ -352,19 +440,20 @@ int main()
 		fprintf(stderr, "Could not create window");
 		return -1;
 	}
-	if (!gladLoadGL())
+	glfwMakeContextCurrent(main);
+
+	if (!gladLoaderLoadGL())
 	{
 		fprintf(stderr, "could not load GL");
 		return -1;
 	}
 
-	glfwMakeContextCurrent(main);
 	glfwSwapInterval(1);
 	glEnable(GL_BLEND);
-	glBlendFunc();
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
 
-	Shader textShader("txt.vert", "txt.grid");
+	Shader textShader("txt.vert", "txt.frag");
 	Shader gridShader("grid.vert", "grid.frag");
 	GLuint VAO, VBO;
 	int fbw, fbh;
@@ -373,11 +462,17 @@ int main()
 	
 	SudokuGame game(fbw, fbh, VAO, VBO, textShader, gridShader, main);
 
-	glfwSetMouseButtonCallback(main, );
+	glfwSetMouseButtonCallback(main, mouseCallBack);
 
 	while (!glfwWindowShouldClose(main))
 	{
-		game.process_input();
+		if (TO_CHECK)
+		{
+			//wait for input digit
+
+			game.changeGridVal(INPUT_DIGIT);
+			TO_CHECK = false;
+		}
 		game.drawLines();
 		glfwSwapBuffers(main);
 		glfwPollEvents();
