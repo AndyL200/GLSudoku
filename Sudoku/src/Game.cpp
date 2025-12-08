@@ -1,13 +1,17 @@
 #include "Shader.h"
 #include <vector>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
-
+#include <filesystem>
 
 bool TO_CHECK = false;
 int INPUT_DIGIT = 0;
+std::pair<double, double> CURSOR_POS = { -1, -1 };
 
 struct GameParameters
 {
@@ -15,8 +19,8 @@ struct GameParameters
 	std::vector<GLfloat> selections;
 	std::vector<GLfloat> gaps_x;
 	std::vector<GLfloat> gaps_y;
-	std::vector<GLfloat> indicies_bottom;
-	std::vector<GLfloat> indicies;
+	std::vector<GLuint> indicies_bottom;
+	std::vector<GLuint> indicies;
 	float left;
 	float right;
 	float top;
@@ -29,7 +33,6 @@ struct GLParameters
 	GLFWwindow* window;
 	Shader* txtShader;
 	Shader* gridShader;
-	GLint uniform_tex, uniform_col;
 	FT_Library lib;
 	FT_Face face;
 };
@@ -39,25 +42,33 @@ class SudokuGame
 public:
 	unsigned int lives = 3;
 	unsigned int matrix[9][9] = { 0 };
-	int sx, sy;
+	float sx, sy;
 	GLParameters glP;
 	GameParameters GP;
 
-	SudokuGame(int& width, int& height, GLuint& vao, GLuint& vbo, Shader& txt, Shader& g, GLFWwindow* window)
-	{
+	~SudokuGame() {
+		FT_Done_Face(glP.face);
+		FT_Done_FreeType(glP.lib);
+		glDeleteProgram(glP.gridShader->ID);
+		glDeleteProgram(glP.txtShader->ID);
+		glDeleteVertexArrays(1, &glP.VAO);
+		glDeleteBuffers(1, &glP.VBO);
+	}
 
+	SudokuGame(int& width, int& height, Shader& txt, Shader& g, GLFWwindow* window)
+	{
 		//should change with resize
 		sx = 2.0f/width;
 		sy = 2.0f/height;
 		glP.txtShader = &txt;
 		glP.gridShader = &g;
-		glP.VAO = vao;
-		glP.VBO = vbo;
+		
 		glP.window = window;
 
 		//grab shader uniforms
-		glP.uniform_tex = glGetUniformLocation(txt.ID, "tex");
-		glP.uniform_col = glGetUniformLocation(txt.ID, "color");
+		GLint utex = glGetUniformLocation(txt.ID, "tex");
+		GLint utexcol = glGetUniformLocation(txt.ID, "color");
+		GLint ugridcol = glGetUniformLocation(g.ID, "col");
 
 		//center game region on the window
 		float padding_x = width * 0.2f;
@@ -66,10 +77,13 @@ public:
 		GP.left = left;
 		float right = width - padding_x;
 		GP.right = right;
-		float top = height - padding_y;
-		GP.top = top;
-		float bottom = padding_y;
+
+		//Coordinate system increases downwards
+		float bottom = height - padding_y;
 		GP.bottom = bottom;
+		
+		float top = padding_y;
+		GP.top = top;
 
 		float gapx = right - left;
 		float gapy = top - bottom;
@@ -166,6 +180,8 @@ public:
 			20, 21
 
 		};
+
+		glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, -1.0f, 1.0f);
 		glGenVertexArrays(1, &glP.VAO);
 		glGenBuffers(1, &glP.VBO);
 		glGenBuffers(1, &glP.EBO);
@@ -173,8 +189,15 @@ public:
 		glActiveTexture(GL_TEXTURE0);
 		glGenTextures(1, &glP.tex);
 		glBindTexture(GL_TEXTURE_2D, glP.tex);
-		glUniform1i(glP.uniform_tex, 0);
-		glUniform3f(glP.uniform_col, 1.0f, 1.0f, 1.0f);
+
+		glUseProgram(glP.txtShader->ID);
+		glUniform1i(utex, 0);
+		glUniform3f(utexcol, 1.0f, 1.0f, 1.0f);
+		glUniformMatrix4fv(glGetUniformLocation(glP.txtShader->ID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+		glUseProgram(glP.gridShader->ID);
+		glUniform3f(ugridcol, 1.0f, 1.0f, 1.0f);
+		glUniformMatrix4fv(glGetUniformLocation(glP.gridShader->ID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
 		FT_Library ft;
 		if (FT_Init_FreeType(&ft))
@@ -193,6 +216,7 @@ public:
 			fprintf(stderr, "Could not Load Character");
 			return;
 		}
+		FT_Set_Pixel_Sizes(facade, 0, 48);
 
 		this->glP.lib = ft;
 		this->glP.face = facade;
@@ -200,13 +224,6 @@ public:
 
 	}
 
-	~SudokuGame()
-	{
-		glDeleteProgram(glP.gridShader->ID);
-		glDeleteProgram(glP.txtShader->ID);
-		glDeleteVertexArrays(1, &glP.VAO);
-		glDeleteBuffers(1, &glP.VBO);
-	}
 	void drawLines()
 	{
 		glBindVertexArray(glP.VAO);
@@ -214,10 +231,11 @@ public:
 
 		glP.gridShader->Use();
 
-		glVertexAttribPointer(0, sizeof(GLfloat) * 2, GL_FLOAT, GL_FALSE, 0, 0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(0);
 		glBufferData(GL_ARRAY_BUFFER, GP.vertices.size() * sizeof(GLfloat), GP.vertices.data(), GL_STATIC_DRAW);
 
-		glDrawArrays(GL_LINE, 0, 36);
+		glDrawArrays(GL_LINES, 0, GP.vertices.size() / 2);
 
 	}
 	enum SudokuState
@@ -230,17 +248,29 @@ public:
 	{
 
 	}
-
-	void renderDigit(int digit, int x, int y)
+	std::pair<float, float> gridToScreen(int x, int y) {
+		float gapx = GP.right - GP.left;
+		float gapy = GP.top - GP.bottom;
+		float cell_w = gapx / 9.0f;
+		float cell_h = gapy / 9.0f;
+		//centered in cell
+		float screen_x = GP.left + x * cell_w + cell_w / 2.0f;
+		float screen_y = GP.top + y * cell_h + cell_h / 2.0f;
+		return {screen_x, screen_y};
+	}
+	void renderDigit(int digit, int x0, int y0)
 	{
-
+		std::pair<float, float> screen_pos = gridToScreen(x0, y0);
+		float x = screen_pos.first;
+		float y = screen_pos.second;
 		glBindVertexArray(glP.VAO);
 		glBindBuffer(GL_ARRAY_BUFFER, glP.VBO);
 
-		glVertexAttribPointer(0, sizeof(GLfloat) * 4, GL_FLOAT, GL_FALSE, 0, 0);
+		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(0);
 
 		glP.txtShader->Use();
-		char d = digit + 32;
+		char d = digit + '0';
 
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -293,15 +323,16 @@ public:
 	}
 	SudokuState sudokuValid()
 	{
-		uint16_t row = 0, col = 0, box = 0;
+		
 		uint16_t count = 0;
 
 		for (int i = 0; i < 9; ++i)
 		{
+			uint16_t row = 0, col = 0, box = 0;
 			for (int j = 0; j < 9; ++j)
 			{
 				int digit = matrix[i][j]-1;
-				if (1 << digit & row)
+				if ((1 << digit) & row)
 				{
 					return SUDOKU_INVALID;
 				}
@@ -310,17 +341,17 @@ public:
 				}
 
 				digit = matrix[j][i] - 1;
-				if (1 << digit & col)
+				if ((1 << digit) & col)
 				{
 					return SUDOKU_INVALID;
 				}
 				else if (digit >= 0)
 				{
-					col |= 1 << matrix[j][i];
+					col |= 1 << digit;
 				}
 
 				digit = matrix[(3 * (i / 3)) + j / 3][3 * (i % 3) + j % 3] - 1;
-				if (1 << digit & box)
+				if ((1 << digit) & box)
 				{
 					return SUDOKU_INVALID;
 				}
@@ -329,7 +360,7 @@ public:
 					box |= 1 << digit;
 				}
 			}
-			uint16_t max_solve = 1 << 10 - 1;
+			uint16_t max_solve = (1u << 9) - 1;
 			if (row == max_solve && col == max_solve && box == max_solve)
 			{
 				count++;
@@ -341,6 +372,16 @@ public:
 		}
 		
 		return SUDOKU_NEUTRAL;
+	}
+
+	void renderMatrix() {
+		for(int i = 0; i < 9; ++i) {
+			for(int j = 0; j < 9; ++j) {
+				if(matrix[i][j] != 0) {
+					renderDigit(matrix[i][j], i, j);
+				}
+			}
+		}
 	}
 	void process_input(int digit, int x, int y)
 	{
@@ -356,24 +397,30 @@ public:
 			lives -= 1;
 			matrix[x][y] = 0;
 		}
-		renderDigit(matrix[x][y], x, y);
+		
 	}
 
+	void setCurrentCursorPos(int& x, int& y) {
+		x = CURSOR_POS.first;
+		y = CURSOR_POS.second;
+	}
+
+	//convert cursor pos to grid indicies
 	std::pair<int, int> insideGrid()
 	{
-		double xpos, ypos;
-		glfwGetCursorPos(glP.window, &xpos, &ypos);
-		if (xpos > GP.left and xpos <  GP.right and ypos > GP.top and ypos < GP.bottom)
+		double xpos = CURSOR_POS.first, ypos = CURSOR_POS.second;
+		//convert coordinate system???
+		if (xpos >= GP.left && xpos <=  GP.right && ypos >= GP.top && ypos <= GP.bottom)
 		{
-			int x_idx = -1;
-			int y_idx = -1;
+			int x_idx = 0;
+			int y_idx = 0;
 			for (int i = 0; i < 8; ++i)
 			{
-				if (xpos > GP.gaps_x[i])
+				if (xpos > GP.left + GP.gaps_x[i])
 				{
 					x_idx = i;
 				}
-				if (ypos > GP.gaps_y[i])
+				if (ypos > GP.top + GP.gaps_y[i])
 				{
 					y_idx = i;
 				}
@@ -383,9 +430,9 @@ public:
 		return { -1, -1 };
 	}
 
-	void changeGridVal(int val)
+	void changeGridVal(int val, std::pair<int, int>& pos)
 	{
-		std::pair<int, int> p = insideGrid();
+		std::pair<int, int> p = pos;
 		int x_i = p.first;
 		int y_i = p.second;
 
@@ -407,9 +454,9 @@ public:
 
 		glP.gridShader->Use();
 
-		glVertexAttribPointer(0, sizeof(GLfloat) * 2, GL_FLOAT, GL_FALSE, 0, 0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
 		glBufferData(GL_ARRAY_BUFFER, GP.selections.size() * sizeof(GLfloat), GP.selections.data(), GL_STATIC_DRAW);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, GP.indicies_bottom.size() * sizeof(GLfloat), GP.indicies_bottom.data(), GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, GP.indicies_bottom.size() * sizeof(GLuint), GP.indicies_bottom.data(), GL_STATIC_DRAW);
 
 
 		glDrawElements(GL_LINES, GP.indicies_bottom.size(), GL_UNSIGNED_INT, 0);
@@ -422,6 +469,7 @@ static void mouseCallBack(GLFWwindow* window, int button, int action, int mods)
 {
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
 	{
+		glfwGetCursorPos(window, &CURSOR_POS.first, &CURSOR_POS.second);
 		TO_CHECK = true;
 	}
 }
@@ -429,6 +477,7 @@ static void mouseCallBack(GLFWwindow* window, int button, int action, int mods)
 
 int main()
 {
+	
 	if (!glfwInit())
 	{
 		fprintf(stderr, "Could not init GLFW");
@@ -452,28 +501,40 @@ int main()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
-
-	Shader textShader("txt.vert", "txt.frag");
-	Shader gridShader("grid.vert", "grid.frag");
-	GLuint VAO, VBO;
-	int fbw, fbh;
-	glfwGetWindowSize(main, &fbw, &fbh);
-	glViewport(0, 0, fbw, fbh);
+	Shader textShader("shaders/txt.vert", "shaders/txt.frag");
+	Shader gridShader("shaders/grid.vert", "shaders/grid.frag");
 	
-	SudokuGame game(fbw, fbh, VAO, VBO, textShader, gridShader, main);
+	int fbw, fbh;
+	glfwGetFramebufferSize(main, &fbw, &fbh);
+	glViewport(0, 0, fbw, fbh);
+
+	
+	SudokuGame game(fbw, fbh, textShader, gridShader, main);
 
 	glfwSetMouseButtonCallback(main, mouseCallBack);
-
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	while (!glfwWindowShouldClose(main))
 	{
+		glClear(GL_COLOR_BUFFER_BIT);
+		
+	
+		//consider thread safety
 		if (TO_CHECK)
 		{
 			//wait for input digit
-
-			game.changeGridVal(INPUT_DIGIT);
+			printf("ENTER DIGIT: ");
+			scanf_s("%d", &INPUT_DIGIT);
+			if(INPUT_DIGIT < 1 || INPUT_DIGIT > 9)
+			{
+				INPUT_DIGIT = 0;
+			}
+			std::pair<int, int> pos = game.insideGrid();
+			game.changeGridVal(INPUT_DIGIT, pos);
 			TO_CHECK = false;
 		}
+		game.renderMatrix();
 		game.drawLines();
+		game.waitForUpdate();
 		glfwSwapBuffers(main);
 		glfwPollEvents();
 	}

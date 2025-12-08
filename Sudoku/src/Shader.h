@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 #include <glad/glad.h>
 
 #include <GLFW/glfw3.h>
@@ -15,7 +16,7 @@ class Shader
 {
 public:
 	GLuint ID;
-	Shader(const char* vert, const char* frag);
+	Shader(std::string vert, std::string frag);
 	~Shader();
 	void Use();
 	void Destroy();

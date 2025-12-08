@@ -1,8 +1,10 @@
 #include "Shader.h"
 
-std::string get_file_contents(const char* filename)
+std::string get_file_contents(std::string filename)
 {
-	std::fstream in(filename, std::ios::binary);
+
+	std::ifstream in(filename, std::ios::binary);
+	std::cout << "Opening : [" << filename << "] " << std::endl;
 	std::string contents;
 	if (in)
 	{
@@ -14,12 +16,12 @@ std::string get_file_contents(const char* filename)
 
 		return contents;
 	}
-	fprintf(stderr, "Cannot load file");
+	fprintf(stderr, "Cannot read file\n");
 	return "";
 }
 
 
-Shader::Shader(const char* vert, const char* frag)
+Shader::Shader(std::string vert, std::string frag)
 {
 
 	std::string vertex_txt = get_file_contents(vert);
