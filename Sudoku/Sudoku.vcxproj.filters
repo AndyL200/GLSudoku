@@ -24,6 +24,9 @@
     <ClCompile Include="src\loader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\glad.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Shader.h">
@@ -34,10 +37,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include=".gitignore" />
-    <None Include="src\grid.vert" />
-    <None Include="src\grid.frag" />
-    <None Include="src\txt.vert" />
-    <None Include="src\txt.frag" />
+    <None Include="shaders\grid.frag" />
+    <None Include="shaders\grid.vert" />
+    <None Include="shaders\txt.frag" />
+    <None Include="shaders\txt.vert" />
   </ItemGroup>
 </Project>

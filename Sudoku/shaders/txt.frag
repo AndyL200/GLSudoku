@@ -1,12 +1,15 @@
 #version 330 core
 
 in vec2 texCoords;
-uniform sampler2D tex;
-uniform vec4 color;
-
 out vec4 FragColor;
+
+uniform sampler2D tex;
+uniform vec3 text_color;
+
+
 
 void main()
 {
-FragColor = vec4(1,1,1,texture(tex, texCoords).r) * color;
+    float alpha = texture(tex, texCoords).r;
+    FragColor = vec4(text_color, alpha);
 }
