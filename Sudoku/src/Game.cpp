@@ -8,6 +8,9 @@
 #include FT_FREETYPE_H
 
 #include <filesystem>
+#include <time.h>
+#include <random>
+#include <unordered_set>
 
 
 enum SudokuState
@@ -243,7 +246,7 @@ public:
 		glBindVertexArray(0);
 		
 		glUseProgram(glP.txtShader->ID);
-		glUniform3f(utexcol, 1.0f, 1.0f, 1.0f);
+		glUniform3f(utexcol, 0.1098f, 1.0f, 0.80784f);
 		glUniformMatrix4fv(glGetUniformLocation(glP.txtShader->ID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 		GLint utex = glGetUniformLocation(glP.txtShader->ID, "tex");
 		//problem line
@@ -251,7 +254,7 @@ public:
 
 
 		glUseProgram(glP.gridShader->ID);
-		glUniform3f(ugridcol, 1.0f, 0.0f, 0.0f);
+		glUniform3f(ugridcol, 0.1098f, 0.333333f, 1.0f);
 		glUniformMatrix4fv(glGetUniformLocation(glP.gridShader->ID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
 		FT_Library ft;
@@ -284,6 +287,7 @@ public:
 		this->glP.lib = ft;
 		this->glP.face = facade;
 		digitTexturePreload();
+		sudoku_setup();
 
 	}
 
@@ -310,20 +314,89 @@ public:
 
 
 	}
-	
+	void sudoku_setup() {
+	std::mt19937 mt(time(nullptr));
+    std::unordered_set<int> used;
+    int generated = 0;
+    int target = 17 + std::uniform_int_distribution<int>(0, 7)(mt);  // 17-23 clues
+    int attempts = 0;
+    const int MAX_ATTEMPTS = 1000;  // Prevent infinite loop
+
+    while (generated < target && attempts < MAX_ATTEMPTS) {
+        attempts++;
+        
+        int rand_row = std::uniform_int_distribution<int>(0, 8)(mt);
+        int rand_col = std::uniform_int_distribution<int>(0, 8)(mt);
+        int cell_id = rand_row * 9 + rand_col;
+
+        // Skip if already filled
+        if (used.find(cell_id) != used.end()) {
+            continue;
+        }
+        used.insert(cell_id);
+
+		int rand_val = std::uniform_int_distribution<int>(1, 9)(mt);
+        matrix[rand_row][rand_col] = rand_val;
+
+        // Check if board is still valid
+        if (sudokuValid() != SUDOKU_INVALID) {
+            generated++;
+        } else {
+            // Placement violated rules, undo it and try again
+            matrix[rand_row][rand_col] = 0;
+            used.erase(cell_id);
+        }
+    }
+
+    if (attempts >= MAX_ATTEMPTS) {
+        std::cout << "WARNING: Could only generate " << generated << " valid clues (target was " << target << ")" << std::endl;
+    }
+
+    std::cout << "\t\t\t BOARD (" << generated << " clues)\t\t\t" << std::endl;
+    for (int i = 0; i < 9; i++) {
+        for (int j = 0; j < 9; j++) {
+            std::cout << " [" << matrix[i][j] << "] ";
+        }
+        std::cout << std::endl;
+    }
+}
 	void sudoku_solved()
 	{
 
 	}
 	std::pair<float, float> gridToScreen(int row, int col) {
-		float gapx = GP.right - GP.left;
-		float gapy = GP.bottom - GP.top;
-		float cell_w = gapx / 9.0f;
-		float cell_h = gapy / 9.0f;
-		//centered in cell
-		float screen_x = GP.left + col * cell_w + cell_w / 2.0f;
-		float screen_y = GP.top + row * cell_h + cell_h / 2.0f;
-		return {screen_x, screen_y};
+
+		if (col < 0 || row < 0 || col > 9 || row > 9) {
+			return { -1,-1 };
+		}
+
+		float cell_w = (GP.right - GP.left) / 9.0f;
+		float cell_h = (GP.bottom - GP.top) / 9.0f;
+
+		float xpos, ypos;
+		
+		if (col == 0) {
+			xpos = (GP.left + GP.gaps_x[0])/2;
+		}
+		else if (col < 8) {
+			xpos = (GP.left + GP.gaps_x[col - 1] + GP.gaps_x[col]) / 2;
+		}
+		else {
+			xpos = (GP.gaps_x[7] + GP.right) / 2;
+		}
+
+		if (row == 0) {
+			ypos = (GP.top + GP.gaps_y[0]) / 2;
+		}
+		else if (row < 8) {
+			//average position between two lines
+			ypos = (GP.top + GP.gaps_y[row - 1] + GP.gaps_y[row])/2;
+		}
+		else {
+			ypos = (GP.gaps_y[7] + GP.bottom) / 2;
+		}
+
+		return { xpos + cell_w/2, ypos + cell_h/2 };
 	}
 
 	void digitTexturePreload() {
@@ -376,8 +449,8 @@ public:
 		std::pair<float, float> screen_pos = gridToScreen(row, col);
 		float x = screen_pos.first;
 		float y = screen_pos.second;
-		std::cout << "x:" << x << " " << "y:" << y << std::endl;
-		
+		//std::cout << "x:" << x << " " << "y:" << y << std::endl;
+		if (x == -1 || y == -1) { return; }
 		Character glyph = numericOptions[digit];
 		glP.txtShader->Use();
 		
@@ -495,6 +568,8 @@ public:
 		//change matrix to reflect new digit
 		//every change needs validation
 		matrix[row][col] = digit;
+
+
 		this->GP.state = sudokuValid();
 		if (this->GP.state == SUDOKU_SOLVED)
 		{
@@ -504,6 +579,7 @@ public:
 		if (this->GP.state == SUDOKU_INVALID)
 		{
 			lives -= 1;
+			std::cout << "Life lost; lives: " << lives << std::endl;
 			matrix[row][col] = 0;
 		}
 		
@@ -518,25 +594,25 @@ public:
 	std::pair<int, int> insideGrid()
 	{
 		double xpos = CURSOR_POS.first, ypos = CURSOR_POS.second;
-		//convert coordinate system???
-		if (xpos >= GP.left && xpos <=  GP.right && ypos >= GP.top && ypos <= GP.bottom)
+		//convert to indices
+		if (xpos < GP.left || xpos > GP.right || ypos < GP.top || ypos > GP.bottom)
 		{
-			int x_idx = 0;
-			int y_idx = 0;
-			for (int i = 0; i < 8; ++i)
-			{
-				if (xpos > GP.left + GP.gaps_x[i])
-				{
-					x_idx = i;
-				}
-				if (ypos > GP.top + GP.gaps_y[i])
-				{
-					y_idx = i;
-				}
-			}
-			return { x_idx, y_idx };
+			return { -1, -1 };
 		}
-		return { -1, -1 };
+
+		// Compute cell width and height
+		float cell_w = (GP.right - GP.left) / 9.0f;
+		float cell_h = (GP.bottom - GP.top) / 9.0f;
+
+		// Find which cell the cursor is in
+		int col = (int)((xpos - GP.left) / cell_w);
+		int row = (int)((ypos - GP.top) / cell_h);
+
+		// Clamp to [0, 8]
+		col = (col < 0) ? 0 : (col > 8) ? 8 : col;
+		row = (row < 0) ? 0 : (row > 8) ? 8 : row;
+
+		return { col, row };
 	}
 
 	void changeGridVal(int val, std::pair<int, int>& pos)
@@ -585,8 +661,12 @@ static void mouseCallBack(GLFWwindow* window, int button, int action, int mods)
 {
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
 	{
-		glfwGetCursorPos(window, &CURSOR_POS.first, &CURSOR_POS.second);
-		TO_CHECK = true;
+		if (TO_CHECK == false)
+		{
+			glfwGetCursorPos(window, &CURSOR_POS.first, &CURSOR_POS.second);
+			std::cout << "cursor x" << CURSOR_POS.first << "cursor y" << CURSOR_POS.second << std::endl;
+			TO_CHECK = true;
+		}
 	}
 }
 
@@ -628,12 +708,13 @@ int main()
 	SudokuGame game(fbw, fbh, textShader, gridShader, main);
 
 	glfwSetMouseButtonCallback(main, mouseCallBack);
-	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	//#1DB1DE
+	glClearColor(14/255, 89/255, 111/255, 44/255);
 
 	game.initialRenderMatrix();
 	while (!glfwWindowShouldClose(main))
 	{
-		glClear(GL_COLOR_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
 	
 		//consider thread safety
@@ -649,7 +730,9 @@ int main()
 				INPUT_DIGIT = 0;
 			}
 			std::pair<int, int> pos = game.insideGrid();
-			std::cout << "first position: " << pos.first << "second position" << pos.second << std::endl;
+			std::cout << "first x: " << pos.first << "second y" << pos.second << std::endl;
+			std::pair<double, double> p2 = game.gridToScreen(pos.second, pos.first);
+			std::cout << "xpos x: " << p2.first << "second y" << p2.second << std::endl;
 			game.changeGridVal(INPUT_DIGIT, pos);
 			TO_CHECK = false;
 		}
