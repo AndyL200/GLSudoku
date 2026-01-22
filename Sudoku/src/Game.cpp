@@ -11,6 +11,8 @@
 #include <time.h>
 #include <random>
 #include <unordered_set>
+#include <mutex>
+#include <atomic>
 
 
 enum SudokuState
@@ -22,7 +24,8 @@ enum SudokuState
 //use mutex
 std::pair<double, double> CURSOR_POS = { -1, -1 };
 //use mutex
-bool TO_CHECK = false;
+std::mutex chk;
+std::atomic_bool TO_CHECK = false;
 
 struct Character {
 	unsigned int TextureID;
@@ -39,11 +42,11 @@ struct GameParameters
 	std::vector<GLfloat> gaps_y;
 	std::vector<GLuint> indicies_bottom;
 	std::vector<GLuint> indicies;
-	float left;
-	float right;
-	float top;
-	float bottom;
-	SudokuState state;
+	float left = 0;
+	float right = 0;
+	float top = 0;
+	float bottom = 0;
+	SudokuState state = SUDOKU_NEUTRAL;
 };
 struct GLParameters
 {
@@ -60,7 +63,7 @@ class SudokuGame
 public:
 	unsigned int lives = 3;
 	unsigned int matrix[9][9];
-	Character numericOptions[10];
+	Character numericOptions[10] = {0};
 	GLParameters glP;
 	GameParameters GP;
 
@@ -293,6 +296,7 @@ public:
 
 	void drawLines()
 	{
+		if (this->GP.state == SUDOKU_SOLVED) { return; }
 		glBindVertexArray(glP.vao_grid);
 		glBindBuffer(GL_ARRAY_BUFFER, glP.vbo_grid);
 		//EBO here
@@ -362,6 +366,7 @@ public:
 }
 	void sudoku_solved()
 	{
+		std::printf("You won!");
 
 	}
 	std::pair<float, float> gridToScreen(int row, int col) {
@@ -555,6 +560,9 @@ public:
 	}
 
 	void renderMatrix() {
+		if (this->GP.state == SUDOKU_SOLVED) {
+			return;
+		}
 		for(int i = 0; i < 9; ++i) {
 			for(int j = 0; j < 9; ++j) {
 				renderDigit(matrix[i][j], i, j);
@@ -581,11 +589,13 @@ public:
 			lives -= 1;
 			std::cout << "Life lost; lives: " << lives << std::endl;
 			matrix[row][col] = 0;
+			this->GP.state = SUDOKU_NEUTRAL;
 		}
 		
 	}
 
 	void setCurrentCursorPos(int& x, int& y) {
+		std::lock_guard<std::mutex> lock(chk);
 		x = CURSOR_POS.first;
 		y = CURSOR_POS.second;
 	}
@@ -593,7 +603,9 @@ public:
 	//convert cursor pos to grid indicies
 	std::pair<int, int> insideGrid()
 	{
+		std::lock_guard<std::mutex> lock(chk);
 		double xpos = CURSOR_POS.first, ypos = CURSOR_POS.second;
+		
 		//convert to indices
 		if (xpos < GP.left || xpos > GP.right || ypos < GP.top || ypos > GP.bottom)
 		{
@@ -661,11 +673,12 @@ static void mouseCallBack(GLFWwindow* window, int button, int action, int mods)
 {
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
 	{
-		if (TO_CHECK == false)
+		std::lock_guard<std::mutex> lock(chk);
+		if (!TO_CHECK.load())
 		{
 			glfwGetCursorPos(window, &CURSOR_POS.first, &CURSOR_POS.second);
 			std::cout << "cursor x" << CURSOR_POS.first << "cursor y" << CURSOR_POS.second << std::endl;
-			TO_CHECK = true;
+			TO_CHECK.store(true);
 		}
 	}
 }
@@ -718,7 +731,7 @@ int main()
 		
 	
 		//consider thread safety
-		if (TO_CHECK)
+		if (TO_CHECK.load())
 		{
 			unsigned int INPUT_DIGIT = 0;
 			//wait for input digit
@@ -734,7 +747,7 @@ int main()
 			std::pair<double, double> p2 = game.gridToScreen(pos.second, pos.first);
 			std::cout << "xpos x: " << p2.first << "second y" << p2.second << std::endl;
 			game.changeGridVal(INPUT_DIGIT, pos);
-			TO_CHECK = false;
+			TO_CHECK.store(false);
 		}
 		game.renderMatrix();
 		game.drawLines();
